@@ -22,6 +22,62 @@
 KSZ_REGMAP_TABLE(ksz9477, 32, SPI_ADDR_SHIFT,
 		 SPI_TURNAROUND_SHIFT, SPI_ADDR_ALIGN);
 
+#ifndef CONFIG_OF
+
+/* Choose one of switches. */
+#if 1
+#define CONFIG_KSZ_7_PORTS
+
+/* Choose which port is host port. */
+#if 1
+#define CONFIG_KSZ_7_PORTS_HOST_6
+#else
+#define CONFIG_KSZ_7_PORTS_HOST_7
+#endif
+#endif
+#if 0
+#define CONFIG_KSZ_6_PORTS
+#endif
+#if 0
+#define CONFIG_KSZ_3_PORTS
+#endif
+
+#if defined(CONFIG_KSZ_6_PORTS) || defined(CONFIG_KSZ_7_PORTS)
+#if defined(CONFIG_KSZ_6_PORTS) || defined(CONFIG_KSZ_7_PORTS_HOST_6)
+#define CONFIG_KSZ_HOST_PORT  5
+#endif
+#if defined(CONFIG_KSZ_7_PORTS) && defined(CONFIG_KSZ_7_PORTS_HOST_7)
+#define CONFIG_KSZ_HOST_PORT  6
+#endif
+
+static struct dsa_chip_data ksz_dsa_chip_data = {
+	.port_names[0]	= "lan1",
+	.port_names[1]	= "lan2",
+	.port_names[2]	= "lan3",
+	.port_names[3]	= "lan4",
+	.port_names[4]	= "lan5",
+#if defined(CONFIG_KSZ_6_PORTS) || defined(CONFIG_KSZ_7_PORTS_HOST_6)
+	.port_names[5]	= "cpu",
+#endif
+#if defined(CONFIG_KSZ_7_PORTS) && defined(CONFIG_KSZ_7_PORTS_HOST_6)
+	.port_names[6]	= "lan6",
+#endif
+#if defined(CONFIG_KSZ_7_PORTS) && defined(CONFIG_KSZ_7_PORTS_HOST_7)
+	.port_names[5]	= "lan6",
+	.port_names[6]	= "cpu",
+#endif
+};
+#endif
+#ifdef CONFIG_KSZ_3_PORTS
+#define CONFIG_KSZ_HOST_PORT  2
+static struct dsa_chip_data ksz_dsa_chip_data = {
+	.port_names[0]	= "lan1",
+	.port_names[1]	= "lan2",
+	.port_names[2]	= "cpu",
+};
+#endif
+#endif
+
 static int ksz9477_spi_probe(struct spi_device *spi)
 {
 	struct regmap_config rc;
@@ -31,6 +87,20 @@ static int ksz9477_spi_probe(struct spi_device *spi)
 	dev = ksz_switch_alloc(&spi->dev, spi);
 	if (!dev)
 		return -ENOMEM;
+
+#ifndef CONFIG_OF
+	do {
+		struct net_device *net;
+
+		/* Network device needs to be exist. */
+		net = dev_get_by_name(&init_net, "eth0");
+		if (!net)
+			return -EPROBE_DEFER;
+
+		ksz_dsa_chip_data.netdev[CONFIG_KSZ_HOST_PORT] = &net->dev;
+	} while (0);
+	dev->ds->dev->platform_data = &ksz_dsa_chip_data;
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(ksz9477_regmap_config); i++) {
 		rc = ksz9477_regmap_config[i];
@@ -84,20 +154,12 @@ static const struct of_device_id ksz9477_dt_ids[] = {
 	{ .compatible = "microchip,ksz9563" },
 	{ .compatible = "microchip,ksz8563" },
 	{ .compatible = "microchip,ksz9567" },
+	{ .compatible = "microchip,ksz8567" },
+	{ .compatible = "microchip,ksz8565" },
+	{ .compatible = "microchip,ksz9656" },
 	{},
 };
 MODULE_DEVICE_TABLE(of, ksz9477_dt_ids);
-
-static const struct spi_device_id ksz9477_spi_ids[] = {
-	{ "ksz9477" },
-	{ "ksz9897" },
-	{ "ksz9893" },
-	{ "ksz9563" },
-	{ "ksz8563" },
-	{ "ksz9567" },
-	{ },
-};
-MODULE_DEVICE_TABLE(spi, ksz9477_spi_ids);
 
 static struct spi_driver ksz9477_spi_driver = {
 	.driver = {
@@ -105,7 +167,6 @@ static struct spi_driver ksz9477_spi_driver = {
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(ksz9477_dt_ids),
 	},
-	.id_table = ksz9477_spi_ids,
 	.probe	= ksz9477_spi_probe,
 	.remove	= ksz9477_spi_remove,
 	.shutdown = ksz9477_spi_shutdown,
@@ -119,6 +180,9 @@ MODULE_ALIAS("spi:ksz9893");
 MODULE_ALIAS("spi:ksz9563");
 MODULE_ALIAS("spi:ksz8563");
 MODULE_ALIAS("spi:ksz9567");
+MODULE_ALIAS("spi:ksz8567");
+MODULE_ALIAS("spi:ksz8565");
+MODULE_ALIAS("spi:ksz9656");
 MODULE_AUTHOR("Woojung Huh <Woojung.Huh@microchip.com>");
 MODULE_DESCRIPTION("Microchip KSZ9477 Series Switch SPI access Driver");
 MODULE_LICENSE("GPL");

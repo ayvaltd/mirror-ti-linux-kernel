@@ -762,9 +762,6 @@ static int ksz9477_port_fdb_dump(struct dsa_switch *ds, int port,
 			goto exit;
 		}
 
-		if (!(ksz_data & ALU_VALID))
-			continue;
-
 		/* read ALU table */
 		ksz9477_read_table(dev, alu_table);
 
@@ -1325,6 +1322,8 @@ static void ksz9477_config_cpu_port(struct dsa_switch *ds)
 	for (i = 0; i < dev->mib_port_cnt; i++) {
 		if (i == dev->cpu_port)
 			continue;
+		if (dsa_is_unused_port(dev->ds, i))
+			continue;
 		p = &dev->ports[i];
 
 		/* Initialize to non-zero so that ksz_cfg_port_member() will
@@ -1530,6 +1529,16 @@ static const struct ksz_chip_data ksz9477_switch_chips[] = {
 	{
 		.chip_id = 0x00956700,
 		.dev_name = "KSZ9567",
+		.num_vlans = 4096,
+		.num_alus = 4096,
+		.num_statics = 16,
+		.cpu_ports = 0x7F,	/* can be configured as cpu port */
+		.port_cnt = 7,		/* total physical port count */
+		.phy_errata_9477 = true,
+	},
+	{
+		.chip_id = 0x00856700,
+		.dev_name = "KSZ8567",
 		.num_vlans = 4096,
 		.num_alus = 4096,
 		.num_statics = 16,

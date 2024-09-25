@@ -23,6 +23,28 @@
 #include <linux/reset.h>
 #include <net/page_pool.h>
 
+#if defined(CONFIG_LAN937X_SWITCH)
+#ifndef CONFIG_KSZ_SWITCH
+#define CONFIG_KSZ_SWITCH
+#endif
+#endif
+
+#ifdef CONFIG_KSZ_SWITCH
+#if defined(CONFIG_HAVE_KSZ9897)
+#include "../../micrel/ksz_cfg_9897.h"
+#elif defined(CONFIG_HAVE_KSZ8795)
+#include "../../micrel/ksz_cfg_8795.h"
+#elif defined(CONFIG_HAVE_KSZ8895)
+#include "../../micrel/ksz_cfg_8895.h"
+#elif defined(CONFIG_HAVE_KSZ8863)
+#include "../../micrel/ksz_cfg_8863.h"
+#elif defined(CONFIG_HAVE_KSZ8463)
+#include "../../micrel/ksz_cfg_8463.h"
+#elif defined(CONFIG_HAVE_LAN937X)
+#include "../../microchip/lan937x_cfg.h"
+#endif
+#endif
+
 struct stmmac_resources {
 	void __iomem *addr;
 	const char *mac;
@@ -244,6 +266,24 @@ struct stmmac_priv {
 
 	/* Receive Side Scaling */
 	struct stmmac_rss rss;
+
+#ifdef CONFIG_KSZ_SWITCH
+	struct platform_device	*sw_pdev;
+	struct stmmac_priv	*hw_priv;
+	struct ksz_port		port;
+	int			phy_addr;
+	u32			multi:1;
+	u32			promisc:1;
+	u8			opened;
+	u8			hw_multi;
+	u8			hw_promisc;
+	void			*parent;
+	struct delayed_work	promisc_reset;
+	struct ksz_sw_sysfs	sysfs;
+#ifdef CONFIG_1588_PTP
+	struct ksz_ptp_sysfs	ptp_sysfs;
+#endif
+#endif
 };
 
 enum stmmac_state {
@@ -258,7 +298,6 @@ int stmmac_mdio_register(struct net_device *ndev);
 int stmmac_mdio_reset(struct mii_bus *mii);
 void stmmac_set_ethtool_ops(struct net_device *netdev);
 
-int stmmac_init_tstamp_counter(struct stmmac_priv *priv, u32 systime_flags);
 void stmmac_ptp_register(struct stmmac_priv *priv);
 void stmmac_ptp_unregister(struct stmmac_priv *priv);
 int stmmac_resume(struct device *dev);
@@ -271,7 +310,6 @@ void stmmac_disable_eee_mode(struct stmmac_priv *priv);
 bool stmmac_eee_init(struct stmmac_priv *priv);
 int stmmac_reinit_queues(struct net_device *dev, u32 rx_cnt, u32 tx_cnt);
 int stmmac_reinit_ringparam(struct net_device *dev, u32 rx_size, u32 tx_size);
-int stmmac_bus_clks_config(struct stmmac_priv *priv, bool enabled);
 
 #if IS_ENABLED(CONFIG_STMMAC_SELFTESTS)
 void stmmac_selftest_run(struct net_device *dev,
